@@ -1,0 +1,336 @@
+{
+  "name": "Alertes-Offres",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "Label_4894963273921682891"
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "874099c9-3d67-4e77-b0f4-78c59562d0b3",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "WD0uMRGlyjqLitSH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Tu es un assistant de recherche d'emploi. Voici le texte d'un email d'alerte emploi :\n\n{{ $json.text }}\n\n1. Extrais chaque offre d'emploi présente : source (plateforme), titre, entreprise, lieu, type de contrat (ou \"Non précisé\"), lien.\n2. Pour chaque offre, évalue sa compatibilité avec ce profil :\n\nPROFIL : Jeune diplômé Master 2 Architecte en IA, Paris. Deux stages : automatisation CRM (n8n, Make, Stripe, HubSpot/Salesforce, emailing) et développement backend (APIs REST, Python, Node.js, scraping). Compétences data : PySpark, Databricks, SQL, Airflow/Dagster, DBT, Redshift, Power BI. IA : LLM, RAG, agents IA, NLP. Recherche un CDI, niveau junior.\n\n- piste : \"Data/IA\" (data engineer, IA, ML, data science) ou \"CRM\" (CRM, automatisation, martech, marketing automation)\n- score : de 0 à 100. Pénalise fortement les postes demandant plus de 3 ans d'expérience, les postes seniors ou de management, et les stages/alternances.\n- justification : une phrase courte expliquant le score.\n\nNe fabrique aucune information : si un champ est absent de l'email, écris \"Non précisé\". Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après, exactement à ce format :\n{\"offres\":[{\"source\":\"\",\"titre\":\"\",\"entreprise\":\"\",\"lieu\":\"\",\"contrat\":\"\",\"lien\":\"\",\"piste\":\"\",\"score\":0,\"justification\":\"\"}]}",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        208,
+        0
+      ],
+      "id": "65d1e1f6-90d2-4b6e-9d5d-f168ebf98a1c",
+      "name": "Basic LLM Chain",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        96,
+        208
+      ],
+      "id": "6880d199-7420-48f8-8387-ab3785f97083",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "og5c9aUf1dSxkqJK",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultats = [];\n\nfor (const item of $input.all()) {\n  let brut = item.json.text || '';\n  // Retire les éventuelles balises ```json ajoutées par le modèle\n  brut = brut.replace(/```json|```/g, '').trim();\n  // Garde uniquement la partie entre la première et la dernière accolade\n  const debut = brut.indexOf('{');\n  const fin = brut.lastIndexOf('}');\n  const donnees = JSON.parse(brut.slice(debut, fin + 1));\n\n  for (const offre of donnees.offres || []) {\n    resultats.push({ json: offre });\n  }\n}\n\nreturn resultats;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        0
+      ],
+      "id": "2be46e55-eed1-45d0-bf7c-a4da451bacc4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "dedupeValue": "={{ $json.lien }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "225131b7-07cf-4237-a7a8-688d0fcb8ddb",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "VOTRE_ID_GOOGLE_SHEET",
+          "mode": "list",
+          "cachedResultName": "n8n veille",
+          "cachedResultUrl": "URL_DE_VOTRE_FICHIER"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "URL_DE_VOTRE_FEUILLE_DE_CALCUL"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('dd/MM/yyyy') }}",
+            "Source ": "={{ $json.source }}",
+            "Titre": "={{ $json.titre }}",
+            "Entreprise": "={{ $json.entreprise }}",
+            "Lieu ": "={{ $json.lieu }}",
+            "Contrat ": "={{ $json.contrat }}",
+            "Lien": "={{ $json.lien }}",
+            "Piste": "={{ $json.piste }}",
+            "Score ": "={{ $json.score }}",
+            "Justification": "={{ $json.justification }}",
+            "Statut": "À postuler"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source ",
+              "displayName": "Source ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Titre",
+              "displayName": "Titre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Entreprise",
+              "displayName": "Entreprise",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lieu ",
+              "displayName": "Lieu ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Contrat ",
+              "displayName": "Contrat ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lien",
+              "displayName": "Lien",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Piste",
+              "displayName": "Piste",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score ",
+              "displayName": "Score ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Justification",
+              "displayName": "Justification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Statut",
+              "displayName": "Statut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        976,
+        0
+      ],
+      "id": "f4502ea1-a1d6-44af-8df5-ba2379728a70",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "xrnpTAemu1G75jC2",
+          "name": "Google Sheets account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "2ca29173-692d-49cb-982d-a5f2337a3468",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cfeb2672ec3747a7d20cce59c5ef8d526884afbda78661512da903d7c3c2836a"
+  },
+  "id": "bc4WelFmdfqzjA4f",
+  "tags": []
+}
