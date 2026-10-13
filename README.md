@@ -2,7 +2,7 @@
 
 Un workflow **n8n** qui collecte automatiquement les offres d'emploi reçues par email (LinkedIn, Welcome to the Jungle, APEC, Indeed…), utilise un **LLM** pour extraire chaque offre et évaluer sa compatibilité avec mon profil, puis centralise le tout dans **Google Sheets**, trié par score.
 
-![Schéma du workflow](docs/workflow.png)
+![Schéma du workflow](workflow.png)
 
 ---
 
@@ -35,7 +35,7 @@ flowchart LR
 4. **Remove Duplicates** : ignore les offres déjà traitées lors des exécutions précédentes (dédoublonnage sur le lien), pour éviter les doublons quand une offre apparaît dans plusieurs alertes.
 5. **Google Sheets** : ajoute une ligne par nouvelle offre, avec le statut initial `À postuler`.
 
-![Aperçu du Google Sheet](docs/sheet.png)
+![Aperçu du Google Sheet](sheet.png)
 
 ---
 
@@ -79,7 +79,7 @@ Le nœud *Remove Duplicates* conserve l'historique des liens déjà traités ent
 
 ### Étapes
 
-1. **Importer le workflow** : dans n8n, *Import from File* → `workflow/veille-offres.json`.
+1. **Importer le workflow** : dans n8n, *Import from File* → `veille-offres.json`.
 2. **Créer les credentials** dans n8n :
    - Groq API ;
    - Gmail OAuth2 et Google Sheets OAuth2 (via un projet Google Cloud avec les API Gmail, Sheets et Drive activées).
